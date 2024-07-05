@@ -2,9 +2,9 @@ import latalg
 import numpy as np
 
 def main():
-    b = latalg.lattice(np.array([[20, 5], [90, 0]]))
-
-    print(f"{b.DeepLLL()}")
+    b = latalg.random_lattice(7)
+    print(f"{b.LLL()}")
 
 if __name__ == '__main__':
     main()
+
