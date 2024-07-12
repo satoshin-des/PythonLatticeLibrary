@@ -22,17 +22,21 @@ class lattice():
     def lattice(self):
         return self.basis
 
+    def print(self):
+        print(self.basis)
+
+    def vol(self):
+        return np.sqrt(np.linalg.det(self.basis * self.basis.T))
+
     def GSO(self, mode: str = "normal") -> np.ndarray:
         """
-        Computes Gram-Schmidt orthogonal basis matrix.
-	
-        Parameters
-        ----------
+        # Computes Gram-Schmidt orthogonal basis matrix.
+
+        ## Parameters
         b : numpy.ndarray
             A lattice basis matrix(Each basis is row vector).
 
-        Returns
-        -------
+        ## Returns
         GSOb : numpy.ndarray
             Gram-Schmidt orthogonal basis matrix of an input basis.
         mu : int
@@ -100,10 +104,10 @@ class lattice():
                 self.mu[k + 1 : self.nrows, k - 1] = np.copy(t) + self.mu[k, k - 1] * np.copy(self.mu[k + 1 : self.nrows, k])
 
                 k = max(k - 1, 1)
-        return self.basis
+        return self
     
 
-    def DeepLLL(self, delta : float = 0.99):
+    def DeepLLL(self, delta : float = 0.99, gamma = 1):
         self.B, self.mu = self.GSO(mode = "square")
         k = 1
         while k < self.nrows:
@@ -119,14 +123,17 @@ class lattice():
                     C -= self.mu[k, i] * self.mu[k, i] * self.B[i]
                     i += 1
                 else:
-                    v = np.copy(self.basis[k])
-                    self.basis[i + 1, : k + 1] = np.copy(self.basis[i, : k])
-                    self.basis[i] = np.copy(v)
-                    self.B, self.mu = self.GSO(mode = "square")
+                    if gamma > 0 and (0 <= i <= gamma or k - i <= gamma):
+                        v = np.copy(self.basis[k])
+                        for j in range(i + 1, k + 1)[::-1]:
+                            self.basis[j] = np.copy(self.basis[j - 1])
+                        #self.basis[i + 1 : k + 1] = np.copy(self.basis[i : k])
+                        self.basis[i] = np.copy(v)
+                        self.B, self.mu = self.GSO(mode = "square")
                     k = max(i - 1, 0)
             k += 1
         
-        return self.basis
+        return self
 
 
 class random_lattice(lattice):
