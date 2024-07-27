@@ -26,6 +26,12 @@ class lattice():
         print(self.basis)
 
     def vol(self):
+        """
+        # Computes volume of lattice
+
+        ## Returns
+            volume
+        """
         return np.sqrt(np.linalg.det(self.basis * self.basis.T))
 
     def GSO(self, mode: str = "normal") -> np.ndarray:
@@ -58,22 +64,17 @@ class lattice():
             return self.basis_star, self.B, self.mu
     
 
-    def LLL(self, delta: float = 0.99) -> np.ndarray:
+    def LLL(self, delta: float = 0.99):
         """
-        LLL-reduces.
+        # LLL-reduces.
         This algorithm is from A. K. Lenstra, H. W. Lenstra, and L. Lovasz (1982)
 
-        Parameters
-        ----------
-        b : numpy.ndarray
-            A lattice basis matrix(Each basis is row vector).
+        ## Parameters
         delta : float
             A reduction parameter(0.5 <= delta <= 1).
 
-        Returns
-        -------
-        b : numpy.ndarray
-            LLL-reduced basis matrix.
+        ## Returns
+        LLL-reduced basis matrix.
         """
         self.B, self.mu = self.GSO(mode = "square")
 
@@ -107,7 +108,17 @@ class lattice():
         return self
     
 
-    def DeepLLL(self, delta : float = 0.99, gamma = 1):
+    def DeepLLL(self, delta : float = 0.99):
+        """
+        # Deep-LLL-reduces.
+
+        ## Parameters
+        delta : float
+            A reduction parameter(0.5 <= delta <= 1).
+
+        ## Returns
+        Deep-LLL-reduced basis matrix.
+        """
         self.B, self.mu = self.GSO(mode = "square")
         k = 1
         while k < self.nrows:
@@ -116,23 +127,60 @@ class lattice():
                     q = round(self.mu[k, j])
                     self.basis[k] -= q * np.copy(self.basis[j])
                     self.mu[k, : j + 1] -= q * np.copy(self.mu[j, : j + 1])
-            C = self.B[k]
+            C = self.basis[k] @ self.basis[k]
             i = 0
             while i < k:
                 if C >= delta * self.B[i]:
                     C -= self.mu[k, i] * self.mu[k, i] * self.B[i]
                     i += 1
                 else:
-                    if gamma > 0 and (0 <= i <= gamma or k - i <= gamma):
-                        v = np.copy(self.basis[k])
-                        for j in range(i + 1, k + 1)[::-1]:
-                            self.basis[j] = np.copy(self.basis[j - 1])
-                        #self.basis[i + 1 : k + 1] = np.copy(self.basis[i : k])
-                        self.basis[i] = np.copy(v)
-                        self.B, self.mu = self.GSO(mode = "square")
+                    t = np.copy(self.basis[k])
+                    self.basis[i + 1 : k + 1] = np.copy(self.basis[i : k])
+                    self.basis[i] = np.copy(t)
+                    self.B, self.mu = self.GSO(mode = "square")
                     k = max(i - 1, 0)
             k += 1
         
+        return self
+
+
+    def DualDeepLLL(self, delta : float = 0.99):
+        """
+        # Dual Deep-LLL-reduces.
+
+        ## Parameters
+        delta : float
+            A reduction parameter(0.5 <= delta <= 1).
+
+        ## Returns
+        Dual Deep-LLL-reduced basis matrix.
+        """
+        self.B, self.mu = self.GSO(mode = "square")
+        nu = np.zeros((self.nrows, self.nrows))
+        nu[self.nrows - 1, self.nrows - 1] = 1
+        k = self.nrows - 2
+        while k >= 0:
+            nu[k, k] = 1
+            for j in range(k + 1, self.nrows):
+                nu[k, j] = -np.sum(self.mu[j, k: j] * nu[k, k: j])
+            if nu[k, j] > 0.5 or nu[k, j] < -0.5:
+                q = round(nu[k, j])
+                self.basis[j] += q * np.copy(self.basis[k])
+                nu[k, j: self.nrows] -= q * np.copy(nu[j, j: self.nrows])
+                self.mu[j, : k + 1] += q * np.copy(self.mu[k, : k + 1])
+            l = self.nrows - 1
+            D = np.sum(nu[k, k:] * nu[k, k:] / self.B[k:])
+            while l > k:
+                if self.B[l] * D < delta:
+                    t = np.copy(self.basis[k])
+                    self.basis[k: l] = np.copy(self.basis[k + 1: l + 1])
+                    self.basis[l] = np.copy(t)
+                    k = min(l, self.nrows - 2) + 1
+                    self.B, self.mu = self.GSO(mode = "square")
+                else:
+                    D -= nu[k, l] * nu[k, l] / self.B[l]
+                    l -= 1
+            k -= 1
         return self
 
 
