@@ -1,5 +1,12 @@
+"""
+# PLL
+Provides
+- lattices and operations on lattices
+- lattice reduction algorithms
+- other lattice algorithms(e.g. SVP, CVP, and more)
+"""
+
 import numpy as np
-import time
 
 class lattice():
     def __init__(self, b: np.ndarray, n: int, m: int):
@@ -9,6 +16,7 @@ class lattice():
         self.mu = np.zeros((n, n))
         self.basis_star = np.zeros((n, m))
         self.B = np.zeros(n)
+        self.basis_star, self.mu, self.B = self.GSO(mode = "both")
     
     def __init__(self, b: np.ndarray):
         n, m = b.shape
@@ -18,35 +26,55 @@ class lattice():
         self.mu = np.eye(n)
         self.basis_star = np.zeros((n, m))
         self.B = np.zeros(n)
+        self.basis_star, self.mu, self.B = self.GSO(mode = "both")
+
 
     def lattice(self):
         return self.basis
 
+
     def print(self):
+        """Prints lattice basis.
+        """
         print(self.basis)
 
-    def vol(self):
-        """
-        # Computes volume of lattice
 
-        ## Returns
-            volume
+    def vol(self) -> float:
+        """Computes volume of lattice
+
+        Returns:
+            float: lattice
+        """
+        return np.sqrt(np.linalg.det(self.basis * self.basis.T))
+    
+
+    def volume(self) -> float:
+        """Computes volume of lattice
+
+        Returns:
+            float: lattice
         """
         return np.sqrt(np.linalg.det(self.basis * self.basis.T))
 
+
     def GSO(self, mode: str = "normal") -> np.ndarray:
-        """
-        # Computes Gram-Schmidt orthogonal basis matrix.
+        """Gram-Schmidt's method.
 
-        ## Parameters
-        b : numpy.ndarray
-            A lattice basis matrix(Each basis is row vector).
+        Args:
+            mode (str, optional): What value this function returns. Defaults to "normal".
 
-        ## Returns
-        GSOb : numpy.ndarray
-            Gram-Schmidt orthogonal basis matrix of an input basis.
-        mu : int
-            Gram-Schmidt coefficient matrix
+        - mode = "normal"
+
+            Returns:
+                np.ndarray: GSO-vectors, GSO coefficient matrix
+        - mode = "square"
+
+            Returns:
+                np.ndarray: Squared norms of GSO-vectors, GSO coefficient matrix
+        - mode = "both"
+
+            Returns:
+                np.ndarray: GSO-vectors, Squared norms of GSO-vectors, GSO coefficient matrix
         """
         for i in range(self.nrows):
             self.basis_star[i] = np.copy(self.basis[i])
@@ -64,17 +92,41 @@ class lattice():
             return self.basis_star, self.B, self.mu
     
 
-    def LLL(self, delta: float = 0.99):
+    def potential(self) -> float:
+        """Computes potential of the lattice basis
+
+        Returns:
+            float: Potential
         """
-        # LLL-reduces.
-        This algorithm is from A. K. Lenstra, H. W. Lenstra, and L. Lovasz (1982)
+        return np.prod(self.B ** np.arange(self.nrows, 0. -1))
 
-        ## Parameters
-        delta : float
-            A reduction parameter(0.5 <= delta <= 1).
 
-        ## Returns
-        LLL-reduced basis matrix.
+    def pot(self) -> float:
+        """Computes potential of the lattice basis.
+
+        Returns:
+            float: Potential.
+        """
+        return np.prod(self.B ** np.arange(self.nrows, 0. -1))
+
+
+    def orthogonality_defect(self) -> float:
+        """Computes orthogonality defect of the lattice basis.
+
+        Returns:
+            float: Orthogonality defect.
+        """
+        return np.prod(np.sum(self.basis * self.basis, axis = 1)) / self.vol()
+
+
+    def LLL(self, delta: float = 0.99) -> np.ndarray:
+        """LLL-reduction (algorithm is from A. K. Lenstra, H. W. Lenstra, and L. Lovasz (1982)).
+
+        Args:
+            delta (float, optional): Reduction parameter(0.5 <= delta <= 1). Defaults to 0.99.
+
+        Returns:
+            np.ndarray: LLL-reduced basis
         """
         self.B, self.mu = self.GSO(mode = "square")
 
@@ -90,8 +142,6 @@ class lattice():
                 k += 1
             else:
                 self.basis[k], self.basis[k - 1] = np.copy(self.basis[k - 1, :]), np.copy(self.basis[k])
-
-                # Updates GSO-information
                 nu = self.mu[k, k - 1]
                 b = self.B[k] + nu * nu * self.B[k - 1]; b_inv = 1. / b
                 self.mu[k, k - 1] = nu * self.B[k - 1] * b_inv
@@ -103,21 +153,18 @@ class lattice():
                 t = np.copy(self.mu[k + 1 : self.nrows, k])
                 self.mu[k + 1 : self.nrows, k] = np.copy(self.mu[k + 1 : self.nrows, k - 1]) - nu * np.copy(t)
                 self.mu[k + 1 : self.nrows, k - 1] = np.copy(t) + self.mu[k, k - 1] * np.copy(self.mu[k + 1 : self.nrows, k])
-
                 k = max(k - 1, 1)
-        return self
+        return self.basis
     
 
-    def DeepLLL(self, delta : float = 0.99):
-        """
-        # Deep-LLL-reduces.
+    def DeepLLL(self, delta : float = 0.99) -> np.ndarray:
+        """Deep-LLL-reduction (algorithm is from C.P.Schnorr and M. Euchner(1994)).
 
-        ## Parameters
-        delta : float
-            A reduction parameter(0.5 <= delta <= 1).
+        Args:
+            delta (float, optional): Reduction parameter. Defaults to 0.99.
 
-        ## Returns
-        Deep-LLL-reduced basis matrix.
+        Returns:
+            np.ndarray: Deep-LLL-reduced basis
         """
         self.B, self.mu = self.GSO(mode = "square")
         k = 1
@@ -141,19 +188,17 @@ class lattice():
                     k = max(i - 1, 0)
             k += 1
         
-        return self
+        return self.basis
 
 
-    def DualDeepLLL(self, delta : float = 0.99):
-        """
-        # Dual Deep-LLL-reduces.
+    def DualDeepLLL(self, delta : float = 0.99) -> np.ndarray:
+        """Dual Deep-LLL-reduction.
 
-        ## Parameters
-        delta : float
-            A reduction parameter(0.5 <= delta <= 1).
+        Args:
+            delta (float, optional): Reduction parameter. Defaults to 0.99.
 
-        ## Returns
-        Dual Deep-LLL-reduced basis matrix.
+        Returns:
+            np.ndarray: Dual Deep-LLL-reduced basis.
         """
         self.B, self.mu = self.GSO(mode = "square")
         nu = np.zeros((self.nrows, self.nrows))
@@ -181,7 +226,52 @@ class lattice():
                     D -= nu[k, l] * nu[k, l] / self.B[l]
                     l -= 1
             k -= 1
-        return self
+        return self.basis
+    
+
+    def ENUM(self) -> np.ndarray:
+        """Enumerates the shortest vector on the lattices.
+
+        Returns:
+            np.ndarray: The shortest vector
+        """
+        def _ENUM_(mu: np.ndarray, B: np.ndarray, n: int) -> np.ndarray:
+            sigma = np.zeros((n + 1, n)); rho = np.zeros(n + 1)
+            r = np.arange(n + 1); r -= 1; r = np.roll(r, -1); print(r)
+            v = np.zeros(n, int); v[0] = 1
+            c = np.zeros(n); w = np.zeros(n, int)
+            last_nonzero = 0; k = 0; R = B[0]
+            while True:
+                tmp = v[k] - c[k]; tmp *= tmp
+                rho[k] = rho[k + 1] + tmp * B[k]
+                if rho[k] <= R:
+                    if k == 0:	return v
+                    k -= 1
+                    r[k - 1] = max(r[k - 1], r[k])
+                    for i in range(k + 1, r[k] + 1)[::-1]:
+                        sigma[i, k] = sigma[i + 1, k] + mu[i, k] * v[i]
+                    c[k] = -sigma[k + 1, k]
+                    v[k] = np.round(c[k])
+                    w[k] = 1
+                else:
+                    k += 1
+                    if k == n: return np.zeros(n, int)
+                    r[k - 1] = k
+                    if k >= last_nonzero:
+                        last_nonzero = k
+                        v[k] += 1
+                    else:
+                        if v[k] > c[k]:	v[k] -= w[k]
+                        else: v[k] += w[k]
+                        w[k] += 1
+        
+        ENUM_v = np.zeros(self.nrows, int)
+        while True:
+            pre_ENUM_v = np.copy(ENUM_v)
+            ENUM_v = _ENUM_(self.mu, self.B, self.nrows)
+            if np.all(ENUM_v == 0): return pre_ENUM_v @ self.basis
+            tmp = np.linalg.norm(ENUM_v @ self.basis) - 1 
+            R = tmp * tmp
 
 
 class random_lattice(lattice):
