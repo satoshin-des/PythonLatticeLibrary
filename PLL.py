@@ -7,6 +7,7 @@ Provides
 """
 
 import numpy as np
+import sympy
 
 class lattice():
     def __init__(self, b: np.ndarray, n: int, m: int):
@@ -16,7 +17,6 @@ class lattice():
         self.mu = np.zeros((n, n))
         self.basis_star = np.zeros((n, m))
         self.B = np.zeros(n)
-        self.basis_star, self.mu, self.B = self.GSO(mode = "both")
     
     def __init__(self, b: np.ndarray):
         n, m = b.shape
@@ -26,7 +26,6 @@ class lattice():
         self.mu = np.eye(n)
         self.basis_star = np.zeros((n, m))
         self.B = np.zeros(n)
-        self.basis_star, self.mu, self.B = self.GSO(mode = "both")
 
 
     def lattice(self):
@@ -82,7 +81,7 @@ class lattice():
                 self.mu[i, j] = (self.basis[i] @ self.basis_star[j]) / (self.basis_star[j] @ self.basis_star[j])
                 self.basis_star[i] -= self.mu[i, j] * np.copy(self.basis_star[j])
             if mode == "square" or mode == "both":
-                self.B[i] = self.basis_star[i] @ self.basis_star[i]
+                self.B[i] = np.dot(self.basis_star[i], self.basis_star[i])
        
         if mode == "normal":
             return self.basis_star, self.mu
@@ -108,6 +107,24 @@ class lattice():
             float: Potential.
         """
         return np.prod(self.B ** np.arange(self.nrows, 0. -1))
+
+
+    def SS(self) -> float:
+        """Computes the squared-sum of the lengths of the GSO-vectors.
+
+        Returns:
+            float: The squared-sum of the lengths of the GSO-vectors.
+        """
+        return np.sum(self.GSO(mode = "square")[0])
+    
+
+    def SquaredSum(self) -> float:
+        """Computes the squared-sum of the lengths of the GSO-vectors.
+
+        Returns:
+            float: The squared-sum of the lengths of the GSO-vectors.
+        """
+        return np.sum(self.GSO(mode = "square")[0])
 
 
     def orthogonality_defect(self) -> float:
@@ -191,6 +208,33 @@ class lattice():
         return self.basis
 
 
+    def PotLLLReduce(self, delta: float = 0.99) -> np.ndarray:
+        l = 0
+        self.basis = self.LLL(delta = 0.99)
+        self.B, self.mu = self.GSO(mode = "square")
+        while l < self.nrows:
+            print(l)
+            for j in range(l)[::-1]:
+                if abs(self.mu[l, j]) > 0.5:
+                    q = round(self.mu[l, j])
+                    self.basis[l] -= q * np.copy(self.basis[j])
+                    self.mu[l, : j + 1] -= q * np.copy(self.mu[j, : j + 1])
+            P = P_min = 1.; k = 0
+            for j in range(l)[::-1]:
+                S = 0.0
+                for i in range(j, l): S += self.mu[l, i] * self.mu[l, i] * self.B[i]
+                P *= (self.B[l] + S) / self.B[j]
+                if P < P_min: k = j; P_min = P
+            if delta > P_min:
+                t = np.copy(self.basis[l])
+                self.basis[k + 1: l + 1] = np.copy(self.basis[k: l])
+                self.basis[k] = np.copy(t)
+                self.B, self.mu = self.GSO(mode = "square")
+                l = k
+            else: l += 1
+        return self.basis
+
+
     def DualDeepLLL(self, delta : float = 0.99) -> np.ndarray:
         """Dual Deep-LLL-reduction.
 
@@ -230,17 +274,28 @@ class lattice():
     
 
     def ENUM(self) -> np.ndarray:
-        """Enumerates the shortest vector on the lattices.
+        """Enumerates the shortest vector on the lattices(algorithm is from N. Gama, P. Q. Nguyen and O. Regev(2010)).
 
         Returns:
             np.ndarray: The shortest vector
         """
-        def _ENUM_(mu: np.ndarray, B: np.ndarray, n: int) -> np.ndarray:
-            sigma = np.zeros((n + 1, n)); rho = np.zeros(n + 1)
-            r = np.arange(n + 1); r -= 1; r = np.roll(r, -1); print(r)
+        def _ENUM_(mu: np.ndarray, B: np.ndarray, n: int, delta: float) -> np.ndarray:
+            """A sub-routine of the function ENUM. This computes a vector whose norm is short(algorithm is from N. Gama, P. Q. Nguyen and O. Regev(2010)).
+    
+            Args:
+                mu (np.ndarray): GSO-coefficient matirx
+                B (np.ndarray): Squared norms of GSO-vectors.
+                n (int): Rank of lattice.
+                delta (float): A parameter.
+
+            Returns:
+                np.ndarray: A vector whose norm is shorter than delta * B[0]
+            """
+            sigma = np.zeros((n + 1, n), float); rho = np.zeros(n + 1, float)
+            r = np.arange(n + 1); r -= 1; r = np.roll(r, -1)
             v = np.zeros(n, int); v[0] = 1
             c = np.zeros(n); w = np.zeros(n, int)
-            last_nonzero = 0; k = 0; R = B[0]
+            last_nonzero = 0; k = 0; R = delta * B[0]
             while True:
                 tmp = v[k] - c[k]; tmp *= tmp
                 rho[k] = rho[k + 1] + tmp * B[k]
@@ -265,13 +320,121 @@ class lattice():
                         else: v[k] += w[k]
                         w[k] += 1
         
+        self.B, self.mu = self.GSO(mode = "square")
         ENUM_v = np.zeros(self.nrows, int)
+        delta = 1.
         while True:
             pre_ENUM_v = np.copy(ENUM_v)
-            ENUM_v = _ENUM_(self.mu, self.B, self.nrows)
-            if np.all(ENUM_v == 0): return pre_ENUM_v @ self.basis
-            tmp = np.linalg.norm(ENUM_v @ self.basis) - 1 
-            R = tmp * tmp
+            ENUM_v = _ENUM_(self.mu, self.B, self.nrows, delta)
+            if np.all(ENUM_v == 0): return pre_ENUM_v
+            delta *= 0.99
+    
+
+    def project_basis(self, k: int, l: int) -> np.ndarray:
+        """Computes a projected lattice basis matrix.
+
+        Args:
+            k (int): _description_
+            l (int): _description_
+
+        Returns:
+            np.ndarray: Projected basis.
+        """
+        self.basis_star, self.mu = self.GSO()
+        pi_b = np.zeros((l - k + 1, self.ncols))
+        for i in range(k, l + 1):
+            for j in range(k, self.nrows):
+                pi_b[i - k] += (self.basis[i] @ self.basis_star[j]) / (self.basis_star[j] @ self.basis_star[j]) * np.copy(self.basis_star[j])
+        return pi_b
+
+
+    def BKZ(self, beta: int, delta: float = 0.99) -> np.ndarray:
+        """BKZ-reduces a lattice basis matrix(algorithm is from C. P. Schnorr and M. Euchner(1994)).
+
+        Args:
+            beta (int): Block size.
+            delta (float, optional): Reduction parameter. Defaults to 0.99.
+
+        Returns:
+            np.ndarray: BKZ-reduced basis matirx.
+        """
+        self.basis = self.LLL(delta = delta)
+        z = k = 0
+        while z < self.nrows - 2:
+            print(z)
+            if k == self.nrows - 1: k = 0
+            k1 = k; k += 1
+            l = min(k1 + beta, self.nrows); h = min(l + 1, self.nrows)
+            self.B, self.mu = self.GSO(mode = "square")
+            p = lattice(self.basis[k1: l, k1: l])
+            w = p.ENUM(); s = w @ self.project_basis(k1, l - 1)
+            if (not np.all(s == 0)) and self.B[k1] > s @ s:
+                z = 0
+                c = lattice(np.zeros((h + 1, self.ncols)))
+                c.basis[: k1] = np.copy(self.basis[: k1])
+                c.basis[k1] = w @ self.basis[k1: l]
+                c.basis[k: h + 1] = np.copy(self.basis[k1: h])
+                _, inds = sympy.Matrix(c.basis).T.rref()
+                c.basis = np.copy(c.basis[np.array(inds)]); c.nrows = h
+                c.basis = c.LLL(delta = delta)
+                self.basis[: h] = np.copy(c.basis[: h])
+            else:
+                z += 1
+                c = lattice(self.basis[: h])
+                self.basis[: h] = c.LLL(delta = delta)
+        return self.basis
+    
+
+    def DeepBKZ(self, beta: int, delta: float = 0.99) -> np.ndarray:
+        """Deep-BKZ-reduces a lattice basis matrix.
+
+        Args:
+            beta (int): Block size.
+            delta (float, optional): Reduction parameter. Defaults to 0.99.
+
+        Returns:
+            np.ndarray: Deep-BKZ-reduced basis matrix.
+        """
+        z = k = 0
+        while z < self.nrows - 1:
+            print(z)
+            if k == self.nrows - 1: k = 0
+            k1 = k; k += 1
+            l = min(k1 + beta, self.nrows); h = min(l + 1, self.nrows)
+            self.B, self.mu = self.GSO(mode = "square")
+            p = lattice(self.basis[k1: l, k1: l])
+            w = p.ENUM(); s = w @ self.project_basis(k1, l - 1)
+            if (not np.all(s == 0)) and self.B[k1] > s @ s:
+                z = 0
+                c = lattice(np.zeros((h + 1, self.ncols)))
+                c.basis[: k1] = np.copy(self.basis[: k1])
+                c.basis[k1] = w @ self.basis[k1: l]
+                c.basis[k: h + 1] = np.copy(self.basis[k1: h])
+                _, inds = sympy.Matrix(c.basis).T.rref()
+                c.basis = np.copy(c.basis[np.array(inds)]); c.nrows = h
+                c.basis = c.DeepLLL(delta = delta)
+                self.basis[: h] = np.copy(c.basis[: h])
+            else:
+                z += 1
+                c = lattice(self.basis[: h])
+                self.basis[: h] = c.LLL(delta = delta)
+        return self.basis
+
+
+    
+
+    def Babai(self, w: np.ndarray):
+        """Computes an approximate solution of CVP for target w using Babai's nearest plane algorithm(algorithm is from L. Babai(1986)).
+
+        Args:
+            w (np.ndarray): A target vector.
+        """
+        t = np.copy(w)
+        self.basis_star, _ = self.GSO(mode = "normal")
+        for i in range(self.nrows)[::-1]:
+            c = round(t @ self.basis_star / (self.basis_star @ self.basis_star))
+            t -= c * np.copy(self.basis[i])
+        return w - t
 
 
 class random_lattice(lattice):
