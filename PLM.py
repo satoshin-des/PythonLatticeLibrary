@@ -1,5 +1,8 @@
 """
 # PLM(Python Lattice Module)
+
+PLM(official name: Python Lattice Module) is a module for lattices.
+
 Provides
 - lattices and operations on lattices
 - lattice reduction algorithms
@@ -27,10 +30,6 @@ class lattice():
         self.mu = np.eye(n)
         self.basis_star = np.zeros((n, m))
         self.B = np.zeros(n)
-
-
-    def lattice(self):
-        return self.basis
 
 
     def print(self):
@@ -145,7 +144,7 @@ class lattice():
         """
         for i in range(1, self.nrows):
             for j in range(i)[::-1]:
-                if abs(self.mu[i, j]) > 0.5:
+                if self.mu[i, j] > 0.5 or self.mu[i, j] < -0.5:
                     q = round(self.mu[i, j])
                     self.basis[i] -= q * np.copy(self.basis[j])
                     self.mu[i, : j + 1] -= q * np.copy(self.mu[j, : j + 1])
@@ -333,7 +332,7 @@ class lattice():
         return self.basis
     
 
-    def ENUM(self) -> np.ndarray:
+    def ENUM_SVP(self) -> np.ndarray:
         """Enumerates the shortest vector on the lattices(algorithm is from N. Gama, P. Q. Nguyen and O. Regev(2010)).
 
         Returns:
@@ -397,7 +396,7 @@ class lattice():
         Returns:
             np.ndarray: The shortest vector on the lattice.
         """
-        return self.ENUM()
+        return self.ENUM_SVP()
 
 
     def project_basis(self, k: int, l: int) -> np.ndarray:
@@ -439,7 +438,7 @@ class lattice():
             l = min(k1 + beta, self.nrows); h = min(l + 1, self.nrows)
             self.B, self.mu = self.GSO(mode = "square")
             p = lattice(self.basis[k1: l, k1: l])
-            w = p.ENUM(); s = w @ self.project_basis(k1, l - 1)
+            w = p.ENUM_SVP(); s = w @ self.project_basis(k1, l - 1)
             if (not np.all(s == 0)) and self.B[k1] > np.dot(s, s):
                 z = 0
                 c = lattice(np.zeros((h + 1, self.ncols)))
@@ -455,42 +454,6 @@ class lattice():
                 c = lattice(self.basis[: h])
                 self.basis[: h] = c.LLL(delta = delta)
         return self.basis
-    
-
-    def DeepBKZ(self, beta: int, delta: float = 0.99) -> np.ndarray:
-        """Deep-BKZ-reduces a lattice basis matrix.
-
-        Args:
-            beta (int): Block size.
-            delta (float, optional): Reduction parameter. Defaults to 0.99.
-
-        Returns:
-            np.ndarray: Deep-BKZ-reduced basis matrix.
-        """
-        z = k = 0
-        while z < self.nrows - 1:
-            print(z)
-            if k == self.nrows - 1: k = 0
-            k1 = k; k += 1
-            l = min(k1 + beta, self.nrows); h = min(l + 1, self.nrows)
-            self.B, self.mu = self.GSO(mode = "square")
-            p = lattice(self.basis[k1: l, k1: l])
-            w = p.ENUM(); s = w @ self.project_basis(k1, l - 1)
-            if (not np.all(s == 0)) and self.B[k1] > s @ s:
-                z = 0
-                c = lattice(np.zeros((h + 1, self.ncols), int))
-                c.basis[: k1] = np.copy(self.basis[: k1])
-                c.basis[k1] = w @ self.basis[k1: l]
-                c.basis[k: h + 1] = np.copy(self.basis[k1: h])
-                _, inds = sympy.Matrix(c.basis).T.rref()
-                c.basis = np.copy(c.basis[np.array(inds)]); c.nrows = h
-                c.basis = c.DeepLLL(delta = delta)
-                self.basis[: h] = np.copy(c.basis[: h])
-            else:
-                z += 1
-                c = lattice(self.basis[: h])
-                self.basis[: h] = c.LLL(delta = delta)
-        return self.basis
 
 
     def Babai(self, w: np.ndarray):
@@ -500,11 +463,81 @@ class lattice():
             w (np.ndarray): A target vector.
         """
         t = np.copy(w)
-        self.basis_star, _ = self.GSO(mode = "normal")
+        self.basis_star, self.mu = self.GSO(mode = "normal")
         for i in range(self.nrows)[::-1]:
-            c = round(t @ self.basis_star / (self.basis_star @ self.basis_star))
+            c = round(np.dot(t, self.basis_star[i]) / np.dot(self.basis_star[i], self.basis_star[i]))
             t -= c * np.copy(self.basis[i])
         return w - t
+    
+
+    def ENUM_CVP(self, t: np.ndarray) -> np.ndarray:
+        """Enumerates the closest vector to target t on the lattice(algorithm is from M. Liu and P. Q. Nguyen(2013)).
+
+        Args:
+            t (np.ndarray): A target vector.
+
+        Returns:
+            np.ndarray: The closest vector.
+        """
+        def _ENUM_(mu: np.ndarray, B: np.ndarray, n: int, a: np.ndarray, R: float) -> np.ndarray:
+            """A sub-routine of function ENUM. This computes a vector that is close to target(algorithm is from M. Liu and P. Q. Nguyen(2013)).
+
+            Args:
+                mu (np.ndarray): GSO-coefficient matrix.
+                B (np.ndarray): Squared norms of GSO-vectors.
+                n (int): Rank of lattice.
+                a (np.ndarray): The coefficient vector of target vector on the lattice basis.
+                R (float): Upper bound of enumeration.
+
+            Returns:
+                np.ndarray: A vector that is close to target.
+            """
+            sigma = np.zeros((n + 1, n), float); rho = np.zeros(n + 1, float)
+            r = np.arange(n + 1, dtype=int); r -= 1; r = np.roll(r, -1)
+            v = np.zeros(n, int)
+            c = np.zeros(n); w = np.zeros(n, int)
+            for k in range(n)[::-1]:
+                for i in range(k + 1, n)[::-1]:
+                    sigma[i, k] = sigma[i + 1, k] + (a[i] - v[i]) * mu[i, k]
+                c[k] = a[k] + sigma[k + 1, k]
+                v[k] = round(c[k]); w[k] = 1
+                tmp = c[k] - v[k]; tmp *= tmp
+                rho[k] = rho[k + 1] + tmp * B[k]
+            k = 0
+            while True:
+                if R < 1: return np.zeros(n, int)
+                tmp = v[k] - c[k]; tmp *= tmp
+                rho[k] = rho[k + 1] + tmp * B[k]
+                if rho[k] <= R:
+                    if k == 0: return v
+                    k -= 1
+                    r[k - 1] = max(r[k - 1], r[k])
+                    for i in range(k + 1, r[k] + 1)[::-1]:
+                        sigma[i, k] = sigma[i + 1, k] + (a[i] - v[i]) * mu[i, k]
+                    c[k] = a[k] + sigma[k + 1, k]
+                    v[k] = np.round(c[k])
+                    w[k] = 1
+                else:
+                    k += 1
+                    if k == n: return np.zeros(n, int)
+                    r[k - 1] = k
+                    if v[k] > c[k]:	v[k] -= w[k]
+                    else: v[k] += w[k]
+                    w[k] += 1
+        
+        self.B, self.mu = self.GSO(mode = "square")
+        ENUM_v = np.zeros(self.nrows, int)
+        babaivec = self.Babai(t); R = np.dot(babaivec - t, babaivec - t)
+        a = t @ np.linalg.pinv(self.basis)
+        while True:
+            pre_ENUM_v = np.copy(ENUM_v)
+            ENUM_v = _ENUM_(self.mu, self.B, self.nrows, a, R)
+            if np.all(ENUM_v == 0): return pre_ENUM_v @ self.basis
+            R *= 0.99
+    
+
+    def CVP(self, t: np.array) -> np.ndarray:
+        return self.ENUM_CVP(t)
 
 
 class random_lattice(lattice):
