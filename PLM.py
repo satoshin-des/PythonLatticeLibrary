@@ -1,5 +1,5 @@
 """
-# PLL
+# PLM(Python Lattice Module)
 Provides
 - lattices and operations on lattices
 - lattice reduction algorithms
@@ -208,12 +208,11 @@ class lattice():
         return self.basis
 
 
-    def PotLLLReduce(self, delta: float = 0.99) -> np.ndarray:
+    def PotLLL(self, delta: float = 0.99) -> np.ndarray:
         l = 0
         self.basis = self.LLL(delta = 0.99)
         self.B, self.mu = self.GSO(mode = "square")
         while l < self.nrows:
-            print(l)
             for j in range(l)[::-1]:
                 if abs(self.mu[l, j]) > 0.5:
                     q = round(self.mu[l, j])
@@ -221,8 +220,7 @@ class lattice():
                     self.mu[l, : j + 1] -= q * np.copy(self.mu[j, : j + 1])
             P = P_min = 1.; k = 0
             for j in range(l)[::-1]:
-                S = 0.0
-                for i in range(j, l): S += self.mu[l, i] * self.mu[l, i] * self.B[i]
+                S = np.sum(self.mu[l, j: l] * self.mu[l, j: l] * self.B[j: l])
                 P *= (self.B[l] + S) / self.B[j]
                 if P < P_min: k = j; P_min = P
             if delta > P_min:
@@ -406,7 +404,7 @@ class lattice():
             w = p.ENUM(); s = w @ self.project_basis(k1, l - 1)
             if (not np.all(s == 0)) and self.B[k1] > s @ s:
                 z = 0
-                c = lattice(np.zeros((h + 1, self.ncols)))
+                c = lattice(np.zeros((h + 1, self.ncols), int))
                 c.basis[: k1] = np.copy(self.basis[: k1])
                 c.basis[k1] = w @ self.basis[k1: l]
                 c.basis[k: h + 1] = np.copy(self.basis[k1: h])
@@ -439,9 +437,8 @@ class lattice():
 
 class random_lattice(lattice):
     def __init__(self, n: int):
-        while True:
-            lattice.basis = np.random.randint(1000, size = (n, n))
-            if np.linalg.det(lattice.basis) != 0: break
+        lattice.basis = np.eye(n, dtype = int)
+        lattice.basis[:, 0] = np.random.randint(500, 1000, size = (n, ))
         lattice.nrows = n
         lattice.ncols = n
         lattice.mu = np.eye(n)
