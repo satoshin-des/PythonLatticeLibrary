@@ -8,6 +8,7 @@ Provides
 
 import numpy as np
 import sympy
+import sys
 
 class lattice():
     def __init__(self, b: np.ndarray, n: int, m: int):
@@ -78,7 +79,7 @@ class lattice():
         for i in range(self.nrows):
             self.basis_star[i] = np.copy(self.basis[i])
             for j in range(i):
-                self.mu[i, j] = (self.basis[i] @ self.basis_star[j]) / (self.basis_star[j] @ self.basis_star[j])
+                self.mu[i, j] = np.dot(self.basis[i], self.basis_star[j]) / np.dot(self.basis_star[j], self.basis_star[j])
                 self.basis_star[i] -= self.mu[i, j] * np.copy(self.basis_star[j])
             if mode == "square" or mode == "both":
                 self.B[i] = np.dot(self.basis_star[i], self.basis_star[i])
@@ -136,6 +137,59 @@ class lattice():
         return np.prod(np.sum(self.basis * self.basis, axis = 1)) / self.vol()
 
 
+    def size(self) -> np.ndarray:
+        """Size-reduction(algorithm is from M. Yasuda and Y. Aoki).
+
+        Returns:
+            np.ndarray: Size-reduced lattice basis matrix.
+        """
+        for i in range(1, self.nrows):
+            for j in range(i)[::-1]:
+                if abs(self.mu[i, j]) > 0.5:
+                    q = round(self.mu[i, j])
+                    self.basis[i] -= q * np.copy(self.basis[j])
+                    self.mu[i, : j + 1] -= q * np.copy(self.mu[j, : j + 1])
+        return self.basis
+
+
+    def Gauss(self) -> np.ndarray:
+        """Gauss reduction
+
+        Returns:
+            np.ndarray: Gauss reduced lattice basis matrix.
+        """
+        if self.nrows > 2:
+            sys.exit("Rank Error: Lagrange reduction is only for 2-dimensional lattices")
+        if np.linalg.norm(self.basis[0]) > np.linalg.norm(self.basis[1]):
+            self.basis[0], self.basis[1] = np.copy(self.basis[1]), np.copy(self.basis[0])
+        while True:
+            v = self.basis[1] - round(np.dot(self.basis[0], self.basis[1]) / np.dot(self.basis[0], self.basis[0])) * self.basis[0]
+            self.basis[1] = self.basis[0]
+            self.basis[0] = np.copy(v)
+            if np.linalg.norm(self.basis[0]) >= np.linalg.norm(self.basis[1]):
+                self.basis[0], self.basis[1] = np.copy(self.basis[1]), np.copy(self.basis[0])
+                return self.basis
+
+
+    def Lagrange(self) -> np.ndarray:
+        """Lagrange reduction
+
+        Returns:
+            np.ndarray: Lagrange reduced lattice basis matrix.
+        """
+        if self.nrows > 2:
+            sys.exit("Rank Error: Lagrange reduction is only for 2-dimensional lattices")
+        if np.linalg.norm(self.basis[0]) > np.linalg.norm(self.basis[1]):
+            self.basis[0], self.basis[1] = np.copy(self.basis[1]), np.copy(self.basis[0])
+        while True:
+            v = self.basis[1] - round(np.dot(self.basis[0], self.basis[1]) / np.dot(self.basis[0], self.basis[0])) * self.basis[0]
+            self.basis[1] = self.basis[0]
+            self.basis[0] = np.copy(v)
+            if np.linalg.norm(self.basis[0]) >= np.linalg.norm(self.basis[1]):
+                self.basis[0], self.basis[1] = np.copy(self.basis[1]), np.copy(self.basis[0])
+                return self.basis
+
+
     def LLL(self, delta: float = 0.99) -> np.ndarray:
         """LLL-reduction (algorithm is from A. K. Lenstra, H. W. Lenstra, and L. Lovasz (1982)).
 
@@ -191,7 +245,7 @@ class lattice():
                     q = round(self.mu[k, j])
                     self.basis[k] -= q * np.copy(self.basis[j])
                     self.mu[k, : j + 1] -= q * np.copy(self.mu[j, : j + 1])
-            C = self.basis[k] @ self.basis[k]
+            C = np.dot(self.basis[k], self.basis[k])
             i = 0
             while i < k:
                 if C >= delta * self.B[i]:
@@ -209,6 +263,14 @@ class lattice():
 
 
     def PotLLL(self, delta: float = 0.99) -> np.ndarray:
+        """Potential-LLL-reduces the lattice basis matrix.
+
+        Args:
+            delta (float, optional): Reduction parameter. Defaults to 0.99.
+
+        Returns:
+            np.ndarray: A potential-LLL-reduced lattice basis matrix.
+        """
         l = 0
         self.basis = self.LLL(delta = 0.99)
         self.B, self.mu = self.GSO(mode = "square")
@@ -290,15 +352,16 @@ class lattice():
                 np.ndarray: A vector whose norm is shorter than delta * B[0]
             """
             sigma = np.zeros((n + 1, n), float); rho = np.zeros(n + 1, float)
-            r = np.arange(n + 1); r -= 1; r = np.roll(r, -1)
+            r = np.arange(n + 1, dtype=int); r -= 1; r = np.roll(r, -1)
             v = np.zeros(n, int); v[0] = 1
             c = np.zeros(n); w = np.zeros(n, int)
             last_nonzero = 0; k = 0; R = delta * B[0]
             while True:
+                if R < 1: return np.zeros(n, int)
                 tmp = v[k] - c[k]; tmp *= tmp
                 rho[k] = rho[k + 1] + tmp * B[k]
                 if rho[k] <= R:
-                    if k == 0:	return v
+                    if k == 0: return v
                     k -= 1
                     r[k - 1] = max(r[k - 1], r[k])
                     for i in range(k + 1, r[k] + 1)[::-1]:
@@ -328,6 +391,15 @@ class lattice():
             delta *= 0.99
     
 
+    def SVP(self) -> np.ndarray:
+        """Enumerates the shortest vector on the lattices.
+
+        Returns:
+            np.ndarray: The shortest vector on the lattice.
+        """
+        return self.ENUM()
+
+
     def project_basis(self, k: int, l: int) -> np.ndarray:
         """Computes a projected lattice basis matrix.
 
@@ -342,12 +414,14 @@ class lattice():
         pi_b = np.zeros((l - k + 1, self.ncols))
         for i in range(k, l + 1):
             for j in range(k, self.nrows):
-                pi_b[i - k] += (self.basis[i] @ self.basis_star[j]) / (self.basis_star[j] @ self.basis_star[j]) * np.copy(self.basis_star[j])
+                pi_b[i - k] += np.dot(self.basis[i], self.basis_star[j]) / np.dot(self.basis_star[j], self.basis_star[j]) * np.copy(self.basis_star[j])
         return pi_b
 
 
     def BKZ(self, beta: int, delta: float = 0.99) -> np.ndarray:
         """BKZ-reduces a lattice basis matrix(algorithm is from C. P. Schnorr and M. Euchner(1994)).
+
+        Now this function is very unstable.
 
         Args:
             beta (int): Block size.
@@ -366,7 +440,7 @@ class lattice():
             self.B, self.mu = self.GSO(mode = "square")
             p = lattice(self.basis[k1: l, k1: l])
             w = p.ENUM(); s = w @ self.project_basis(k1, l - 1)
-            if (not np.all(s == 0)) and self.B[k1] > s @ s:
+            if (not np.all(s == 0)) and self.B[k1] > np.dot(s, s):
                 z = 0
                 c = lattice(np.zeros((h + 1, self.ncols)))
                 c.basis[: k1] = np.copy(self.basis[: k1])
@@ -375,7 +449,7 @@ class lattice():
                 _, inds = sympy.Matrix(c.basis).T.rref()
                 c.basis = np.copy(c.basis[np.array(inds)]); c.nrows = h
                 c.basis = c.LLL(delta = delta)
-                self.basis[: h] = np.copy(c.basis[: h])
+                self.basis[: h] = np.copy(c.basis)
             else:
                 z += 1
                 c = lattice(self.basis[: h])
@@ -418,8 +492,6 @@ class lattice():
                 self.basis[: h] = c.LLL(delta = delta)
         return self.basis
 
-
-    
 
     def Babai(self, w: np.ndarray):
         """Computes an approximate solution of CVP for target w using Babai's nearest plane algorithm(algorithm is from L. Babai(1986)).
