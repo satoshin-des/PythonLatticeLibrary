@@ -10,7 +10,6 @@ Provides
 """
 
 import numpy as np
-import sympy
 import sys
 
 class lattice():
@@ -56,6 +55,19 @@ class lattice():
         return np.sqrt(np.linalg.det(self.basis * self.basis.T))
 
 
+    def dual(self):
+        """Computes dual-lattice.
+
+        Returns:
+            lattice: Dual-lattice.
+        """
+        c = lattice(self.basis)
+        self.basis_star, self.mu = self.GSO()
+        c.basis = np.matmul(np.matmul(np.linalg.inv(self.mu.T), np.linalg.inv(np.matmul(self.basis_star, self.basis_star.T))), self.basis_star)
+        c.basis_star, c.mu = c.GSO()
+        return c
+
+
     def GSO(self, mode: str = "normal") -> np.ndarray:
         """Gram-Schmidt's method.
 
@@ -82,7 +94,6 @@ class lattice():
                 self.basis_star[i] -= self.mu[i, j] * np.copy(self.basis_star[j])
             if mode == "square" or mode == "both":
                 self.B[i] = np.dot(self.basis_star[i], self.basis_star[i])
-       
         if mode == "normal":
             return self.basis_star, self.mu
         elif mode == "square":
@@ -171,7 +182,7 @@ class lattice():
 
 
     def Lagrange(self) -> np.ndarray:
-        """Lagrange reduction
+        """Lagrange reduction. This is other name of Gauss().
 
         Returns:
             np.ndarray: Lagrange reduced lattice basis matrix.
@@ -199,7 +210,6 @@ class lattice():
             np.ndarray: LLL-reduced basis
         """
         self.B, self.mu = self.GSO(mode = "square")
-
         k = 1
         while k < self.nrows:
             for j in range(k)[::-1]:
@@ -207,7 +217,6 @@ class lattice():
                     q = round(self.mu[k, j])
                     self.basis[k] -= q * np.copy(self.basis[j])
                     self.mu[k, : j + 1] -= q * np.copy(self.mu[j, : j + 1])
-
             if self.B[k] >= (delta - self.mu[k, k - 1] * self.mu[k, k - 1]) * self.B[k - 1]:
                 k += 1
             else:
@@ -257,8 +266,19 @@ class lattice():
                     self.B, self.mu = self.GSO(mode = "square")
                     k = max(i - 1, 0)
             k += 1
-        
         return self.basis
+    
+
+    def DEEP(self, delta: float = 0.99) -> np.ndarray:
+        """Other name of DeepLLL().
+
+        Args:
+            delta (float, optional): Reduction parameter. Defaults to 0.99.
+
+        Returns:
+            np.ndarray: Deep-LLL-reduced lattice basis matrix.
+        """
+        return self.DeepLLL(delta = delta)
 
 
     def PotLLL(self, delta: float = 0.99) -> np.ndarray:
@@ -281,8 +301,7 @@ class lattice():
                     self.mu[l, : j + 1] -= q * np.copy(self.mu[j, : j + 1])
             P = P_min = 1.; k = 0
             for j in range(l)[::-1]:
-                S = np.sum(self.mu[l, j: l] * self.mu[l, j: l] * self.B[j: l])
-                P *= (self.B[l] + S) / self.B[j]
+                P *= (self.B[l] + np.sum(self.mu[l, j: l] * self.mu[l, j: l] * self.B[j: l])) / self.B[j]
                 if P < P_min: k = j; P_min = P
             if delta > P_min:
                 t = np.copy(self.basis[l])
@@ -370,7 +389,7 @@ class lattice():
                     w[k] = 1
                 else:
                     k += 1
-                    if k == n: return np.zeros(n, int)
+                    if k == n: return None
                     r[k - 1] = k
                     if k >= last_nonzero:
                         last_nonzero = k
@@ -386,7 +405,7 @@ class lattice():
         while True:
             pre_ENUM_v = np.copy(ENUM_v)
             ENUM_v = _ENUM_(self.mu, self.B, self.nrows, delta)
-            if np.all(ENUM_v == 0): return pre_ENUM_v
+            if ENUM_v is None: return np.matmul(pre_ENUM_v, self.basis)
             delta *= 0.99
     
 
@@ -415,45 +434,6 @@ class lattice():
             for j in range(k, self.nrows):
                 pi_b[i - k] += np.dot(self.basis[i], self.basis_star[j]) / np.dot(self.basis_star[j], self.basis_star[j]) * np.copy(self.basis_star[j])
         return pi_b
-
-
-    def BKZ(self, beta: int, delta: float = 0.99) -> np.ndarray:
-        """BKZ-reduces a lattice basis matrix(algorithm is from C. P. Schnorr and M. Euchner(1994)).
-
-        Now this function is very unstable.
-
-        Args:
-            beta (int): Block size.
-            delta (float, optional): Reduction parameter. Defaults to 0.99.
-
-        Returns:
-            np.ndarray: BKZ-reduced basis matirx.
-        """
-        self.basis = self.LLL(delta = delta)
-        z = k = 0
-        while z < self.nrows - 2:
-            print(z)
-            if k == self.nrows - 1: k = 0
-            k1 = k; k += 1
-            l = min(k1 + beta, self.nrows); h = min(l + 1, self.nrows)
-            self.B, self.mu = self.GSO(mode = "square")
-            p = lattice(self.basis[k1: l, k1: l])
-            w = p.ENUM_SVP(); s = w @ self.project_basis(k1, l - 1)
-            if (not np.all(s == 0)) and self.B[k1] > np.dot(s, s):
-                z = 0
-                c = lattice(np.zeros((h + 1, self.ncols)))
-                c.basis[: k1] = np.copy(self.basis[: k1])
-                c.basis[k1] = w @ self.basis[k1: l]
-                c.basis[k: h + 1] = np.copy(self.basis[k1: h])
-                _, inds = sympy.Matrix(c.basis).T.rref()
-                c.basis = np.copy(c.basis[np.array(inds)]); c.nrows = h
-                c.basis = c.LLL(delta = delta)
-                self.basis[: h] = np.copy(c.basis)
-            else:
-                z += 1
-                c = lattice(self.basis[: h])
-                self.basis[: h] = c.LLL(delta = delta)
-        return self.basis
 
 
     def Babai(self, w: np.ndarray):
@@ -519,7 +499,7 @@ class lattice():
                     w[k] = 1
                 else:
                     k += 1
-                    if k == n: return np.zeros(n, int)
+                    if k == n: return None
                     r[k - 1] = k
                     if v[k] > c[k]:	v[k] -= w[k]
                     else: v[k] += w[k]
@@ -528,11 +508,11 @@ class lattice():
         self.B, self.mu = self.GSO(mode = "square")
         ENUM_v = np.zeros(self.nrows, int)
         babaivec = self.Babai(t); R = np.dot(babaivec - t, babaivec - t)
-        a = t @ np.linalg.pinv(self.basis)
+        a = np.matmul(t, np.linalg.pinv(self.basis))
         while True:
             pre_ENUM_v = np.copy(ENUM_v)
             ENUM_v = _ENUM_(self.mu, self.B, self.nrows, a, R)
-            if np.all(ENUM_v == 0): return pre_ENUM_v @ self.basis
+            if ENUM_v is None: return np.matmul(pre_ENUM_v, self.basis)
             R *= 0.99
     
 
