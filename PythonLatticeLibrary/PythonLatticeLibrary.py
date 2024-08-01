@@ -12,18 +12,19 @@ Provides
 import numpy as np
 import sys
 
+
 class lattice():
-    def __init__(self, b: np.ndarray, n: int, m: int):
-        self.basis = np.copy(b)
+    def __init__(self, b: np.ndarray, n: int, m: int, dtype = None):
+        self.basis = np.copy(np.array(b, dtype = dtype))
         self.nrows = n
         self.ncols = m
         self.mu = np.zeros((n, n))
         self.basis_star = np.zeros((n, m))
         self.B = np.zeros(n)
     
-    def __init__(self, b: np.ndarray):
+    def __init__(self, b: np.ndarray, dtype = None):
         n, m = b.shape
-        self.basis = np.copy(b)
+        self.basis = np.copy(np.array(b, dtype = dtype))
         self.nrows = n
         self.ncols = m
         self.mu = np.eye(n)
@@ -34,7 +35,9 @@ class lattice():
     def print(self):
         """Prints lattice basis.
         """
-        print(self.basis)
+        print(f"Basis =\n{self.basis}")
+        print(f"Rank = {self.nrows}")
+        print(f"Volume = {self.vol()}")
 
 
     def vol(self) -> float:
@@ -242,77 +245,6 @@ class lattice():
                 self.mu[k + 1 : self.nrows, k] = np.copy(self.mu[k + 1 : self.nrows, k - 1]) - nu * np.copy(t)
                 self.mu[k + 1 : self.nrows, k - 1] = np.copy(t) + self.mu[k, k - 1] * np.copy(self.mu[k + 1 : self.nrows, k])
                 k = max(k - 1, 1)
-        return self.basis
-    
-
-    def MLLL(self, delta: float = 0.99) -> np.ndarray:
-        """LLL-reduction.
-
-        Args:
-            delta (float, optional): Reduction parameter. Defaults to 0.99.
-
-        Returns:
-            np.ndarray: LLL-reduced basis matrix.
-        """
-        z = self.nrows - 1; g = 0
-        while g <= z:
-            if np.all(self.basis[g] == 0):
-                if g < z:
-                    self.basis[g], self.basis[z] = np.copy(self.basis[z]), np.copy(self.basis[g])
-                z -= 1
-            self.basis_star = self.basis[g]
-            for j in range(g):
-                self.mu[g, j] = np.dot(self.basis[g], self.basis_star[j]) / self.B[j]
-                self.basis_star[g] -= self.mu[g, j] * np.copy(self.basis_star[j])
-            self.B[g] = np.dot(self.basis_star[g], self.basis_star[g])
-            self.mu[g, g] = 1.
-            if g == 0:
-                g = 1
-            else:
-                l = g; k = g; startagain = False
-                while k <= l and (not startagain):
-                    if abs(self.mu[k, k - 1]) > 0.5:
-                        q = round(self.mu[k, k - 1])
-                        self.basis[k] -= q * np.copy(self.basis[k - 1])
-                        self.mu[k, : k] -= q * np.copy(self.mu[k - 1, : k])
-                    nu = self.mu[k, k - 1]
-                    B = self.B[k] + nu * nu * self.B[k - 1]
-                    if B >= delta * self.B[k - 1]:
-                        for j in range(k - 1)[::-1]:
-                            if abs(self.mu[k, j]) > 0.5:
-                                    q = round(self.mu[k, j])
-                                    self.basis[k] -= q * np.copy(self.basis[j])
-                                    self.mu[k, : j + 1] -= q * np.copy(self.mu[j, : j + 1])
-                        k += 1
-                    else:
-                        if np.all(self.basis[k] == 0):
-                            if k < z:
-                                self.basis[z], self.basis[k] = np.copy(self.basis[k]), np.copy(self.basis[z])
-                            z -= 1; g = k; startagain = True
-                        else:
-                            self.basis[k - 1], self.basis[k] = np.copy(self.basis[k]), np.copy(self.basis[k - 1])
-                            self.mu[k, : k - 1], self.mu[k - 1, : k - 1] = np.copy(self.mu[k - 1, : k - 1]), np.copy(self.mu[k, : k - 1])
-                            if B != 0:
-                                if self.B[k] == 0:
-                                    self.B[k - 1] = B
-                                    self.basis_star[k - 1] *= nu
-                                    self.mu[k, k - 1] = 1. / nu
-                                else:
-                                    t = self.B[k - 1] / B; self.mu[k, k - 1] = nu * t
-                                    w = np.copy(self.basis[k - 1]); self.basis[k - 1] = np.copy(self.basis[k]) + nu * np.copy(w)
-                                    self.B[k - 1] = B
-                                    if k <= l:
-                                        self.basis_star[k] = -self.mu[k, k - 1] * np.copy(self.basis_star[k]) + (self.B[k] / B) * np.copy(w)
-                                    t = np.copy(self.mu[k + 1: l + 1, k])
-                                    self.mu[k + 1: l + 1, k] = np.copy(self.mu[k + 1: l + 1, k - 1]) - nu * np.copy(t)
-                                    self.mu[k + 1: l + 1, k - 1] = np.copy(t) + self.mu[k, k - 1] * np.copy(self.mu[k + 1: l + 1, k])
-                            else:
-                                self.B[k], self.B[k - 1] = self.B[k - 1], self.B[k]
-                                self.basis_star[k], self.basis_star[k - 1] = self.basis_star[k - 1], self.basis_star[k]
-                                self.mu[k + 1: l + 1, k], self.mu[k + 1: l + 1, k - 1] = np.copy(self.mu[k + 1: l + 1, k - 1]), np.copy(self.mu[k + 1: l + 1, k])
-                            k = max(k - 1, 2)
-                if not startagain:
-                    g += 1
         return self.basis
 
 
@@ -615,4 +547,46 @@ class random_lattice(lattice):
         lattice.mu = np.eye(n)
         lattice.basis_star = np.zeros((n, n))
         lattice.B = np.zeros(n)
-    
+
+
+def HermiteConstat(n: int) -> float:
+    """Return Hermite constant
+
+    Args:
+        n (int): Rank of lattice.
+
+    Returns:
+        float: n-th Hermite's constant
+    """
+    if n == 1:
+        return 1
+    elif n == 2:
+        return 2 / np.sqrt(3)
+    elif n == 3:
+        return np.cbrt(2)
+    elif n == 4:
+        return np.sqrt(2)
+    elif n == 5:
+        return 8 ** (1. / 5.)
+    elif n == 6:
+        return (64. / 3.) ** (1. / 6.)
+    elif n == 7:
+        return 64 ** (1. / 7.)
+    elif n == 8:
+        return 2
+    elif n == 24:
+        return 4
+    else:
+        sys.exit(f"Rank Error: {n}-th Hermite's constant is not shown.")
+
+
+def Hermite_constant(n : int) -> float:
+    """Other name of the function HermiteConstant
+
+    Args:
+        n (int): Rank of lattice.
+
+    Returns:
+        float: n-th Hermite constant
+    """
+    return HermiteConstat(n)

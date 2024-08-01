@@ -1,1 +1,1 @@
-from PythonLatticeLibrary import PythonLatticeLibrary
+from PythonLatticeLibrary.PythonLatticeLibrary import *
