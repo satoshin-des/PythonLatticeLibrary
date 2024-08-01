@@ -384,7 +384,6 @@ class lattice():
             c = np.zeros(n); w = np.zeros(n, int)
             last_nonzero = 0; k = 0; R = delta * B[0]
             while True:
-                if R < 1: return np.zeros(n, int)
                 tmp = v[k] - c[k]; tmp *= tmp
                 rho[k] = rho[k + 1] + tmp * B[k]
                 if rho[k] <= R:
@@ -494,7 +493,6 @@ class lattice():
                 rho[k] = rho[k + 1] + tmp * B[k]
             k = 0
             while True:
-                if R < 1: return np.zeros(n, int)
                 tmp = v[k] - c[k]; tmp *= tmp
                 rho[k] = rho[k + 1] + tmp * B[k]
                 if rho[k] <= R:
@@ -526,6 +524,14 @@ class lattice():
     
 
     def CVP(self, t: np.array) -> np.ndarray:
+        """Other name of ENUM_CVP.
+
+        Args:
+            t (np.array): A target vector.
+
+        Returns:
+            np.ndarray: The closest vector to target $t$ on the lattice.
+        """
         return self.ENUM_CVP(t)
 
 
