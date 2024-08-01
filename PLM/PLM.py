@@ -53,6 +53,15 @@ class lattice():
             float: lattice
         """
         return np.sqrt(np.linalg.det(self.basis * self.basis.T))
+    
+
+    def det(self) -> float:
+        """Other name of volume.
+
+        Returns:
+            float: Determinant of lattice.
+        """
+        return np.sqrt(np.linalg.det(self.basis * self.basis.T))
 
 
     def dual(self):
