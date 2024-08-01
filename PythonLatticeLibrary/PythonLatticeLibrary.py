@@ -1,7 +1,7 @@
 """
-# PLL(Python Lattice Library)
+# Python Lattice Library
 
-PLM(official name: Python Lattice Module) is a module for lattices.
+Python Lattice Library is a module for lattices.
 
 Provides
 - lattices and operations on lattices
@@ -160,7 +160,7 @@ class lattice():
 
 
     def size(self) -> np.ndarray:
-        """Size-reduction(algorithm is from M. Yasuda and Y. Aoki).
+        """Size-reduction(algorithm is from M. Yasuda and Y. Aoki(2019)).
 
         Returns:
             np.ndarray: Size-reduced lattice basis matrix.
@@ -175,7 +175,7 @@ class lattice():
 
 
     def Gauss(self) -> np.ndarray:
-        """Gauss reduction
+        """Gauss reduction(algorith is from J.-L. Lagrange(1773)).
 
         Returns:
             np.ndarray: Gauss reduced lattice basis matrix.
@@ -294,7 +294,7 @@ class lattice():
 
 
     def PotLLL(self, delta: float = 0.99) -> np.ndarray:
-        """Potential-LLL-reduces the lattice basis matrix.
+        """Potential-LLL-reduces the lattice basis matrix(algorithm is from F. Fontein, M. Schneider and U. Wagner(2013)).
 
         Args:
             delta (float, optional): Reduction parameter. Defaults to 0.99.
@@ -326,7 +326,7 @@ class lattice():
 
 
     def DualDeepLLL(self, delta : float = 0.99) -> np.ndarray:
-        """Dual Deep-LLL-reduction.
+        """Dual Deep-LLL-reduction(algorithm is from M. Yasuda, J. Yamaguchi and M. Ooka(2018)).
 
         Args:
             delta (float, optional): Reduction parameter. Defaults to 0.99.
@@ -427,24 +427,6 @@ class lattice():
             np.ndarray: The shortest vector on the lattice.
         """
         return self.ENUM_SVP()
-
-
-    def project_basis(self, k: int, l: int) -> np.ndarray:
-        """Computes a projected lattice basis matrix.
-
-        Args:
-            k (int): _description_
-            l (int): _description_
-
-        Returns:
-            np.ndarray: Projected basis.
-        """
-        self.basis_star, self.mu = self.GSO()
-        pi_b = np.zeros((l - k + 1, self.ncols))
-        for i in range(k, l + 1):
-            for j in range(k, self.nrows):
-                pi_b[i - k] += np.dot(self.basis[i], self.basis_star[j]) / np.dot(self.basis_star[j], self.basis_star[j]) * np.copy(self.basis_star[j])
-        return pi_b
 
 
     def Babai(self, w: np.ndarray):
