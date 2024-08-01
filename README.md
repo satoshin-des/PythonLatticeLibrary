@@ -226,7 +226,7 @@ Volume = 884.9999999999998
 ```
 
 ## What Functions are Available?
-Available functions in this library are below:
+Available functions in this library are below(This is not a list of all functions in this library):
 - ```vol()```: Computes volume of the lattice.
 - ```GSO()```: Computes Gram-Schmidt information of the lattice basis.
 - ```potential()```: Computes potential of the lattice basis.
