@@ -1,5 +1,4 @@
-# PLL
-Python Lattice Library<br>
+# Python Lattice Library(abbr. PLL)
 This is a python library to use lattices on python.<br>
 This library has algorithms to lattice reduce, solve SVP, solve CVP, and other many operation for lattices.
 
