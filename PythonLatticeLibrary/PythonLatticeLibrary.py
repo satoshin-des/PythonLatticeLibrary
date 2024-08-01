@@ -1,5 +1,5 @@
 """
-# PLM(Python Lattice Module)
+# PLL(Python Lattice Library)
 
 PLM(official name: Python Lattice Module) is a module for lattices.
 
@@ -244,6 +244,77 @@ class lattice():
                 k = max(k - 1, 1)
         return self.basis
     
+
+    def MLLL(self, delta: float = 0.99) -> np.ndarray:
+        """LLL-reduction.
+
+        Args:
+            delta (float, optional): Reduction parameter. Defaults to 0.99.
+
+        Returns:
+            np.ndarray: LLL-reduced basis matrix.
+        """
+        z = self.nrows - 1; g = 0
+        while g <= z:
+            if np.all(self.basis[g] == 0):
+                if g < z:
+                    self.basis[g], self.basis[z] = np.copy(self.basis[z]), np.copy(self.basis[g])
+                z -= 1
+            self.basis_star = self.basis[g]
+            for j in range(g):
+                self.mu[g, j] = np.dot(self.basis[g], self.basis_star[j]) / self.B[j]
+                self.basis_star[g] -= self.mu[g, j] * np.copy(self.basis_star[j])
+            self.B[g] = np.dot(self.basis_star[g], self.basis_star[g])
+            self.mu[g, g] = 1.
+            if g == 0:
+                g = 1
+            else:
+                l = g; k = g; startagain = False
+                while k <= l and (not startagain):
+                    if abs(self.mu[k, k - 1]) > 0.5:
+                        q = round(self.mu[k, k - 1])
+                        self.basis[k] -= q * np.copy(self.basis[k - 1])
+                        self.mu[k, : k] -= q * np.copy(self.mu[k - 1, : k])
+                    nu = self.mu[k, k - 1]
+                    B = self.B[k] + nu * nu * self.B[k - 1]
+                    if B >= delta * self.B[k - 1]:
+                        for j in range(k - 1)[::-1]:
+                            if abs(self.mu[k, j]) > 0.5:
+                                    q = round(self.mu[k, j])
+                                    self.basis[k] -= q * np.copy(self.basis[j])
+                                    self.mu[k, : j + 1] -= q * np.copy(self.mu[j, : j + 1])
+                        k += 1
+                    else:
+                        if np.all(self.basis[k] == 0):
+                            if k < z:
+                                self.basis[z], self.basis[k] = np.copy(self.basis[k]), np.copy(self.basis[z])
+                            z -= 1; g = k; startagain = True
+                        else:
+                            self.basis[k - 1], self.basis[k] = np.copy(self.basis[k]), np.copy(self.basis[k - 1])
+                            self.mu[k, : k - 1], self.mu[k - 1, : k - 1] = np.copy(self.mu[k - 1, : k - 1]), np.copy(self.mu[k, : k - 1])
+                            if B != 0:
+                                if self.B[k] == 0:
+                                    self.B[k - 1] = B
+                                    self.basis_star[k - 1] *= nu
+                                    self.mu[k, k - 1] = 1. / nu
+                                else:
+                                    t = self.B[k - 1] / B; self.mu[k, k - 1] = nu * t
+                                    w = np.copy(self.basis[k - 1]); self.basis[k - 1] = np.copy(self.basis[k]) + nu * np.copy(w)
+                                    self.B[k - 1] = B
+                                    if k <= l:
+                                        self.basis_star[k] = -self.mu[k, k - 1] * np.copy(self.basis_star[k]) + (self.B[k] / B) * np.copy(w)
+                                    t = np.copy(self.mu[k + 1: l + 1, k])
+                                    self.mu[k + 1: l + 1, k] = np.copy(self.mu[k + 1: l + 1, k - 1]) - nu * np.copy(t)
+                                    self.mu[k + 1: l + 1, k - 1] = np.copy(t) + self.mu[k, k - 1] * np.copy(self.mu[k + 1: l + 1, k])
+                            else:
+                                self.B[k], self.B[k - 1] = self.B[k - 1], self.B[k]
+                                self.basis_star[k], self.basis_star[k - 1] = self.basis_star[k - 1], self.basis_star[k]
+                                self.mu[k + 1: l + 1, k], self.mu[k + 1: l + 1, k - 1] = np.copy(self.mu[k + 1: l + 1, k - 1]), np.copy(self.mu[k + 1: l + 1, k])
+                            k = max(k - 1, 2)
+                if not startagain:
+                    g += 1
+        return self.basis
+
 
     def DeepLLL(self, delta : float = 0.99) -> np.ndarray:
         """Deep-LLL-reduction (algorithm is from C.P.Schnorr and M. Euchner(1994)).

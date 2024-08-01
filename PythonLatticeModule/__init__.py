@@ -1,1 +1,0 @@
-from PythonLatticeModule import PythonLatticeModule
