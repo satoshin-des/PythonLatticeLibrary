@@ -23,8 +23,8 @@ class lattice():
         self.B = np.zeros(n)
     
     def __init__(self, b: np.ndarray, dtype = None):
-        n, m = b.shape
         self.basis = np.copy(np.array(b, dtype = dtype))
+        n, m = self.basis.shape
         self.nrows = n
         self.ncols = m
         self.mu = np.eye(n)
@@ -46,7 +46,7 @@ class lattice():
         Returns:
             float: lattice
         """
-        return np.sqrt(np.linalg.det(self.basis * self.basis.T))
+        return np.sqrt(np.linalg.det(np.matmul(self.basis, self.basis.T)))
     
 
     def volume(self) -> float:
@@ -55,7 +55,7 @@ class lattice():
         Returns:
             float: lattice
         """
-        return np.sqrt(np.linalg.det(self.basis * self.basis.T))
+        return np.sqrt(np.linalg.det(np.matmul(self.basis, self.basis.T)))
     
 
     def det(self) -> float:
@@ -64,7 +64,7 @@ class lattice():
         Returns:
             float: Determinant of lattice.
         """
-        return np.sqrt(np.linalg.det(self.basis * self.basis.T))
+        return np.sqrt(np.linalg.det(np.matmul(self.basis, self.basis.T)))
 
 
     def dual(self):
