@@ -1,12 +1,9 @@
-[README in Japanese.](https://github.com/satoshin-des/PythonLatticeLibrary/blob/main/README-ja.md)
-
 # Python Lattice Library(abbr. PLL)
-This is a python library to use lattices on python.<br>
-This library has algorithms to lattice reduce, solve SVP, solve CVP, and other many operation for lattices.
+このPythonライブラリの中には主に格子基底簡約，最短ベクトル問題(SVP)や最近ベクトル問題(CVP)の求解，そして格子に関する演算などが備わっています．
 
-## How to Use?
-### Initialization
-If you want to use ```A = numpy.array([[123, 0, 0], [234, 1, 0], [345, 0, 1]])``` as lattice basis matrix, you can do like below:
+## 使い方
+### 初期化
+もし```A = numpy.array([[123, 0, 0], [234, 1, 0], [345, 0, 1]])``` を格子基底行列として使いたい場合には以下の様にします：
 
 ```Python
 import PythonLatticeLibrary as PLL
@@ -16,7 +13,7 @@ A = np.array([[123, 0, 0], [234, 1, 0], [345, 0, 1]])
 b = PLL.lattice(A)
 b.print()
 ```
-Output is below.
+出力は以下：
 
 ```
 Basis =
@@ -27,7 +24,7 @@ Rank = 3
 Volume = 122.99999999999994
 ```
 
-Not only numpy.array but list is available for argument of ``PLL.lattice()``:
+``numpy.array``だけではなく，``list``でもできます:
 
 ```Python
 import PythonLatticeLibrary as PLL
@@ -37,7 +34,7 @@ A = [[123, 0, 0], [234, 1, 0], [345, 0, 1]]
 b = PLL.lattice(A)
 b.print()
 ```
-Output is below.
+出力は以下：
 
 ```
 Basis =
@@ -48,7 +45,7 @@ Rank = 3
 Volume = 122.99999999999994
 ```
 
-You can generates a random lattice like below:
+乱数的に格子基底を生成することもできます：
 
 ```Python
 import PythonLatticeLibrary as PLL
@@ -57,7 +54,7 @@ b = PLL.random_lattice(5) # Generates 5-dimensional lattice basis.
 b.print()
 ```
 
-Output is below:
+出力は以下：
 
 ```
 Basis =
@@ -70,7 +67,7 @@ Rank = 5
 Volume = 875.0000000044823
 ```
 
-You can reduce lattice basis(e.g. LLL-reduction, Deep-LLL-reduction, etc.) like below:
+格子基底簡約(e.g. LLL簡約, DeepLLL簡約, etc.)をしたいときは，以下の様にしてできます：
 
 ```Python
 import PythonLatticeLibrary as PLL
@@ -81,7 +78,7 @@ b.basis = b.LLL() # LLL-reduction
 b.print()
 ```
 
-Output is below.
+出力は以下：
 
 ```
 Basis =
@@ -102,18 +99,18 @@ Rank = 5
 Volume = 710.9999999999999
 ```
 
-You can select reduction parameter:
+簡約パラメタを指定するときは以下の様にできます．
 
 ```Python
 import PythonLatticeLibrary as PLL
 
 b = PLL.random_lattice(5)
 b.print()
-b.basis = b.LLL(delta=0.5) # LLL-reduction
+b.basis = b.LLL(delta=0.5) # 0.5-LLL簡約
 b.print()
 ```
 
-Output is below:
+出力は以下：
 
 ```
 Basis =
@@ -134,18 +131,18 @@ Rank = 5
 Volume = 813.9999999999997
 ```
 
-You can use other functions for lattice reduction like LLL. Below is the examples.
+LLL簡約以外の簡約も，LLLと同じような感じでできます．以下は一例：
 
 ```Python
 import PythonLatticeLibrary as PLL
 
 b = PLL.random_lattice(5)
 b.print()
-b.basis = b.DeepLLL() # Deep-LLL-reduction
+b.basis = b.DeepLLL() # DeepLLL簡約
 b.print()
 ```
 
-Output is below:
+出力は以下：
 
 ```
 Basis =
@@ -166,7 +163,7 @@ Rank = 5
 Volume = 725.9999999999999
 ```
 
-You can solve SVP using function ``ENUM_SVP()``:
+最短ベクトルを求めるときは``ENUM_SVP()``でできます：
 
 ```Python
 import PythonLatticeLibrary as PLL
@@ -178,7 +175,7 @@ v = b.ENUM_SVP()
 print(v)
 ```
 
-Output is below:
+出力は以下：
 
 ```
 Basis =
@@ -194,7 +191,7 @@ Volume = 924.000000001688
 [ 0 -1  0 -1  1  1  0]
 ```
 
-As same as solving an SVP, you can solve CVP to target t using ``ENUM_CVP(t)``:
+tを目標ベクトルとする最近ベクトルを求めるときも，最短ベクトルと同様に``ENUM_CVP(t)``でできます：
 
 ```Python
 import PythonLatticeLibrary as PLL
@@ -209,7 +206,7 @@ v = b.ENUM_CVP(t)
 print(v)
 ```
 
-Output is below:
+出力は以下：
 
 ```
 Basis =
@@ -226,15 +223,15 @@ Volume = 884.9999999999998
 [17  2  5 17 18  8 15]
 ```
 
-## What Functions are Available?
-Available functions in this library are below(This is not a list of all functions in this library):
-- ```vol()```: Computes volume of the lattice.
-- ```GSO()```: Computes Gram-Schmidt information of the lattice basis.
-- ```potential()```: Computes potential of the lattice basis.
-- ```size()```: Size-reduces the lattice basis.
-- ```Gauss()```: Gauss-reduces the 2-dimensional lattice basis.
-- ```LLL(delta)```: LLL-reduces the lattice basis.
-- ```DeepLLL(delta)```: Deep-LLL-reduces the lattice basis.
-- ```ENUM_SVP()```: Enumerates the shortest vector on the lattice.
-- ````Babai(t)````: Computes an approximate solution of CVP to target t on the lattice with Babai's nearest plane algorithm.
-- ```ENUM_CVP(t)```: Enumerates the closest vector to target t on the lattice.
+## 使える関数
+使える関数は以下（ただし以下の表は使える関数の一覧ではなくいくつか主要な函数を抜萃したに過ぎないことには注意されたい）：
+- ```vol()```: 格子の体積を求める．
+- ```GSO()```: GS0情報を求める．
+- ```potential()```: 格子基底のpotentialを求める．
+- ```size()```: サイズ基底簡約．
+- ```Gauss()```: Gauss簡約．
+- ```LLL(delta)```: delta-LLL簡約．
+- ```DeepLLL(delta)```: delta-DeepLLL簡約．
+- ```ENUM_SVP()```: 最短ベクトルを数え上げ法で求める．
+- ````Babai(t)````: tを目標ベクトルとする近似最近ベクトルをBabaiの最近平面法で求める．
+- ```ENUM_CVP(t)```: tを目標ベクトルとする最近ベクトルを数え上げ法で求める．
