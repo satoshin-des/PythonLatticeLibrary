@@ -46,7 +46,10 @@ class lattice():
         Returns:
             float: lattice
         """
-        return np.sqrt(np.linalg.det(np.matmul(self.basis, self.basis.T)))
+        if self.nrows == self.ncols:
+            return np.linalg.det(self.basis)
+        else:
+            return np.sqrt(np.linalg.det(np.matmul(self.basis, self.basis.T)))
     
 
     def volume(self) -> float:
@@ -55,7 +58,10 @@ class lattice():
         Returns:
             float: lattice
         """
-        return np.sqrt(np.linalg.det(np.matmul(self.basis, self.basis.T)))
+        if self.nrows == self.ncols:
+            return np.linalg.det(self.basis)
+        else:
+            return np.sqrt(np.linalg.det(np.matmul(self.basis, self.basis.T)))
     
 
     def det(self) -> float:
@@ -64,7 +70,10 @@ class lattice():
         Returns:
             float: Determinant of lattice.
         """
-        return np.sqrt(np.linalg.det(np.matmul(self.basis, self.basis.T)))
+        if self.nrows == self.ncols:
+            return np.linalg.det(self.basis)
+        else:
+            return np.sqrt(np.linalg.det(np.matmul(self.basis, self.basis.T)))
 
 
     def dual(self):
@@ -499,20 +508,37 @@ class lattice():
         
         self.B, self.mu = self.GSO(mode = "square")
         ENUM_v = np.zeros(self.nrows, int)
-        babaivec = self.Babai(t); R = np.dot(babaivec - t, babaivec - t)
+        babaivec = self.Babai(t); R = np.dot(babaivec - t, babaivec - t) * 2
         a = np.matmul(t, np.linalg.pinv(self.basis))
+        count = 0
         while True:
             pre_ENUM_v = np.copy(ENUM_v)
             ENUM_v = _ENUM_(self.mu, self.B, self.nrows, a, R)
-            if ENUM_v is None: return np.matmul(pre_ENUM_v, self.basis)
+            if ENUM_v is None:
+                return np.matmul(pre_ENUM_v, self.basis)
             R *= 0.99
     
 
-    def CVP(self, t: np.array) -> np.ndarray:
+    def Kannan(self, t: np.ndarray) -> np.ndarray:
+        """Solve the CVP to target t by Kannan's embedding tecnique(R. Kannan(1983)).
+
+        Args:
+            t (np.ndarray): target vector.
+
+        Returns:
+            np.ndarray: The closest vector to target t.
+        """
+        b = lattice(np.vstack([np.hstack([self.basis, np.zeros((self.ncols, 1))]), np.append(t, [1])]))
+        b.basis = b.LLL()
+        v = b.ENUM_SVP()
+        return t - v[: self.nrows]
+
+
+    def CVP(self, t: np.ndarray) -> np.ndarray:
         """Other name of ENUM_CVP.
 
         Args:
-            t (np.array): A target vector.
+            t (np.ndarray): A target vector.
 
         Returns:
             np.ndarray: The closest vector to target $t$ on the lattice.
